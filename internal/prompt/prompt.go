@@ -11,6 +11,11 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
+// IsInteractive는 stdin이 터미널인지(대화형 선택 가능 여부) 반환한다.
+func IsInteractive() bool {
+	return isatty.IsTerminal(os.Stdin.Fd())
+}
+
 // Select는 options를 번호와 함께 출력하고 사용자가 고른 항목을 반환한다.
 // stdin이 터미널이 아니면(파이프/CI 등) 에러를 반환한다.
 func Select(label string, options []string) (string, error) {

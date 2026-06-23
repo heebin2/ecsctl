@@ -102,6 +102,18 @@ ecs pipeline status my-pipe   # 스테이지/액션별 상태 + 실패 사유
 
 `pipeline`은 `pl`로 줄여 쓸 수 있다 (`ecs pl list`).
 
+### 프로필 / 클러스터 설정
+
+```sh
+ecs profile                 # 프로필 목록(현재 * 표시), 터미널이면 골라서 저장
+ecs profile my-profile      # 지정 프로필로 바로 설정
+ecs cluster                 # 클러스터 목록(현재 * 표시), 터미널이면 골라서 저장
+ecs cluster my-cluster      # 지정 클러스터로 바로 설정
+```
+
+선택값은 `~/.aws/ecs-tools.yml` 에 저장된다. 프로필을 바꾸면 저장된 클러스터는 초기화된다.
+(`ecs profile`은 AWS 호출 없이 `~/.aws` 만 읽고, `ecs cluster`는 계정의 클러스터를 조회한다.)
+
 ## 공통 플래그 / 기본값 저장
 
 | 플래그 | 설명 |

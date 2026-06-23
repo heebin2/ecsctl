@@ -84,3 +84,14 @@ func saveCluster(name string) error {
 	cfg.Cluster = name
 	return cfg.Save()
 }
+
+// saveProfile은 프로필 선택값을 저장한다(값이 같으면 생략).
+// 프로필이 바뀌면 저장된 클러스터는 초기화한다(resolveProfile과 동일 규칙).
+func saveProfile(name string) error {
+	if cfg.Profile == name {
+		return nil
+	}
+	cfg.Profile = name
+	cfg.Cluster = ""
+	return cfg.Save()
+}
