@@ -34,6 +34,26 @@ go install github.com/heebin2/ecsctl/cmd/ecs@latest   # $GOBIN(또는 ~/go/bin)/
 go build -o ecs ./cmd/ecs
 ```
 
+### 릴리스 바이너리
+
+[Releases](https://github.com/heebin2/ecsctl/releases) 에서 OS/arch별 tar.gz를 받아 설치한다.
+
+```sh
+VER=v1.0.0; OS=darwin; ARCH=arm64   # 예: Apple Silicon
+curl -sSL "https://github.com/heebin2/ecsctl/releases/download/${VER}/ecs_${VER}_${OS}_${ARCH}.tar.gz" | tar xz
+sudo install -m 0755 ecs /usr/local/bin/ecs && rm ecs
+```
+
+## 릴리스 / 배포
+
+`v*` 태그를 push하면 GitHub Actions(`.github/workflows/release.yml`)가 darwin/linux
+(amd64·arm64) 바이너리를 빌드해 Release에 업로드한다. 버전은 태그명이 `ecs --version`에 주입된다.
+
+```sh
+git tag v1.0.0
+git push origin v1.0.0
+```
+
 ## 사용법
 
 ### ECS 서비스 목록

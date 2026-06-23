@@ -1,0 +1,48 @@
+name: release
+
+# v로 시작하는 태그(v1.0.0 등)를 push하면 멀티플랫폼 바이너리를 빌드해
+# GitHub Release 에 업로드한다.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write # 릴리스 생성/자산 업로드
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binaries
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          LDFLAGS="-s -w -X github.com/heebin2/ecsctl/internal/cli.version=${VERSION}"
+          mkdir -p dist
+          for platform in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64; do
+            os="${platform%/*}"
+            arch="${platform#*/}"
+            echo "==> building ecs ${VERSION} (${os}/${arch})"
+            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
+              go build -trimpath -ldflags "$LDFLAGS" -o ecs ./cmd/ecs
+            tar -czf "dist/ecs_${VERSION}_${os}_${arch}.tar.gz" ecs
+            rm ecs
+          done
+          ( cd dist && shasum -a 256 *.tar.gz > SHA256SUMS )
+          ls -la dist
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/* \
+            --title "${{ github.ref_name }}" \
+            --generate-notes
