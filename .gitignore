@@ -30,3 +30,10 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# 빌드 산출물 (install.sh가 만드는 실행 파일)
+/ecs
+
+# 로컬 Claude Code 파일
+CLAUDE.md
+.claude/settings.local.json
