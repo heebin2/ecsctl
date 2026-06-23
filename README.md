@@ -148,7 +148,9 @@ ecs --version         # 버전 (install.sh가 git describe로 주입)
 
 ## 참고
 
-- 실시간 로그는 `FilterLogEvents` 폴링(2초 주기) 방식. 더 낮은 지연이 필요하면
-  `internal/logssvc/tail.go`를 CloudWatch `StartLiveTail` 스트리밍 API로 교체할 수 있다.
+- `ecs logs <svc>` 는 `--since`/`--tail` 범위의 과거 로그를 `FilterLogEvents`로 한 번
+  출력한다. `-f` 를 주면 이어서 CloudWatch `StartLiveTail` 스트리밍으로 새 로그를
+  near-real-time 으로 출력한다(Ctrl+C로 종료). `StartLiveTail` 에는 `logs:StartLiveTail`
+  권한이 필요하다.
 - 자격증명이 만료되면 `ExpiredTokenException` 메시지가 출력된다. SSO 사용 시
   `aws sso login` 후 다시 실행한다.

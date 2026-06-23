@@ -5,10 +5,12 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/fatih/color"
 )
@@ -58,32 +60,77 @@ type TailOptions struct {
 	Lines  int           // 최초 출력 시 마지막 N줄만 (0이면 전체)
 }
 
-// Tail은 로그 그룹을 FilterLogEvents로 조회하고, Follow면 주기적으로 폴링한다.
+// Tail은 --since/--tail 범위의 과거 로그를 FilterLogEvents로 한 번 출력하고,
+// Follow면 이어서 StartLiveTail 스트리밍으로 새 로그를 실시간 출력한다.
 func Tail(ctx context.Context, c *cloudwatchlogs.Client, group string, opts TailOptions) error {
 	startMs := time.Now().Add(-opts.Since).UnixMilli()
 	seen := make(map[string]struct{})
-	limit := opts.Lines // 최초 fetch에만 적용
 
-	for {
-		lastTs, err := fetchOnce(ctx, c, group, startMs, seen, limit)
-		if err != nil {
-			return err
-		}
-		limit = 0 // 이후 폴링은 전체 출력
-		if lastTs >= startMs {
-			startMs = lastTs + 1 // 다음 폴링은 마지막 이벤트 이후부터
-		}
+	// 1) 과거 로그 1회 출력 (--tail 지정 시 마지막 N줄만)
+	if _, err := fetchOnce(ctx, c, group, startMs, seen, opts.Lines); err != nil {
+		return err
+	}
 
-		if !opts.Follow {
-			return nil
-		}
+	if !opts.Follow {
+		return nil
+	}
 
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-time.After(2 * time.Second):
+	// 2) 실시간 스트리밍 (near real-time, Ctrl+C로 종료)
+	return liveTail(ctx, c, group)
+}
+
+// liveTail은 StartLiveTail 세션을 열어 새 로그 이벤트를 실시간으로 출력한다.
+func liveTail(ctx context.Context, c *cloudwatchlogs.Client, group string) error {
+	arn, err := resolveLogGroupARN(ctx, c, group)
+	if err != nil {
+		return err
+	}
+
+	out, err := c.StartLiveTail(ctx, &cloudwatchlogs.StartLiveTailInput{
+		LogGroupIdentifiers: []string{arn},
+	})
+	if err != nil {
+		return fmt.Errorf("실시간 로그 세션 시작 실패: %w", err)
+	}
+	stream := out.GetStream()
+	defer stream.Close()
+
+	dim := color.New(color.FgHiBlack)
+	for evt := range stream.Events() {
+		u, ok := evt.(*cwtypes.StartLiveTailResponseStreamMemberSessionUpdate)
+		if !ok {
+			continue // SessionStart 등은 무시
+		}
+		for _, e := range u.Value.SessionResults {
+			ts := time.UnixMilli(aws.ToInt64(e.Timestamp)).Local().Format("15:04:05")
+			fmt.Printf("%s %s %s\n", dim.Sprint(ts), dim.Sprintf("[%s]", aws.ToString(e.LogStreamName)), aws.ToString(e.Message))
 		}
 	}
+	if err := stream.Err(); err != nil {
+		return fmt.Errorf("실시간 로그 스트림 오류: %w", err)
+	}
+	return nil
+}
+
+// resolveLogGroupARN은 로그 그룹 이름으로 StartLiveTail에 쓸 ARN(끝의 :* 제거)을 찾는다.
+func resolveLogGroupARN(ctx context.Context, c *cloudwatchlogs.Client, group string) (string, error) {
+	out, err := c.DescribeLogGroups(ctx, &cloudwatchlogs.DescribeLogGroupsInput{
+		LogGroupNamePrefix: aws.String(group),
+	})
+	if err != nil {
+		return "", fmt.Errorf("로그 그룹 ARN 조회 실패: %w", err)
+	}
+	for _, lg := range out.LogGroups {
+		if aws.ToString(lg.LogGroupName) != group {
+			continue
+		}
+		arn := aws.ToString(lg.LogGroupArn)
+		if arn == "" {
+			arn = aws.ToString(lg.Arn)
+		}
+		return strings.TrimSuffix(arn, ":*"), nil
+	}
+	return "", fmt.Errorf("로그 그룹을 찾을 수 없습니다: %s", group)
 }
 
 // fetchOnce는 startMs 이후 이벤트를 가져와 출력하고, 마지막 타임스탬프를 반환한다.
