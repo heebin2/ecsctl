@@ -55,9 +55,10 @@ func ResolveLogConfig(td *ecstypes.TaskDefinition, container string) (*LogConfig
 
 // TailOptions는 tail 동작을 제어한다.
 type TailOptions struct {
-	Since  time.Duration // 시작 시점 (now - Since)
-	Follow bool          // 실시간 추적 여부
-	Lines  int           // 최초 출력 시 마지막 N줄만 (0이면 전체)
+	Since   time.Duration // 시작 시점 (now - Since)
+	Follow  bool          // 실시간 추적 여부
+	Lines   int           // 최초 출력 시 마지막 N줄만 (0이면 전체)
+	Streams []string      // 특정 로그 스트림만 대상 (비어 있으면 그룹 전체)
 }
 
 // Tail은 --since/--tail 범위의 과거 로그를 FilterLogEvents로 한 번 출력하고,
@@ -67,7 +68,7 @@ func Tail(ctx context.Context, c *cloudwatchlogs.Client, group string, opts Tail
 	seen := make(map[string]struct{})
 
 	// 1) 과거 로그 1회 출력 (--tail 지정 시 마지막 N줄만)
-	if _, err := fetchOnce(ctx, c, group, startMs, seen, opts.Lines); err != nil {
+	if _, err := fetchOnce(ctx, c, group, startMs, seen, opts.Lines, opts.Streams); err != nil {
 		return err
 	}
 
@@ -76,19 +77,24 @@ func Tail(ctx context.Context, c *cloudwatchlogs.Client, group string, opts Tail
 	}
 
 	// 2) 실시간 스트리밍 (near real-time, Ctrl+C로 종료)
-	return liveTail(ctx, c, group)
+	return liveTail(ctx, c, group, opts.Streams)
 }
 
 // liveTail은 StartLiveTail 세션을 열어 새 로그 이벤트를 실시간으로 출력한다.
-func liveTail(ctx context.Context, c *cloudwatchlogs.Client, group string) error {
+// streams가 지정되면 해당 스트림만 추적한다.
+func liveTail(ctx context.Context, c *cloudwatchlogs.Client, group string, streams []string) error {
 	arn, err := resolveLogGroupARN(ctx, c, group)
 	if err != nil {
 		return err
 	}
 
-	out, err := c.StartLiveTail(ctx, &cloudwatchlogs.StartLiveTailInput{
+	in := &cloudwatchlogs.StartLiveTailInput{
 		LogGroupIdentifiers: []string{arn},
-	})
+	}
+	if len(streams) > 0 {
+		in.LogStreamNames = streams
+	}
+	out, err := c.StartLiveTail(ctx, in)
 	if err != nil {
 		return fmt.Errorf("실시간 로그 세션 시작 실패: %w", err)
 	}
@@ -134,11 +140,14 @@ func resolveLogGroupARN(ctx context.Context, c *cloudwatchlogs.Client, group str
 }
 
 // fetchOnce는 startMs 이후 이벤트를 가져와 출력하고, 마지막 타임스탬프를 반환한다.
-// limit>0이면 시간순 마지막 limit개만 출력한다.
-func fetchOnce(ctx context.Context, c *cloudwatchlogs.Client, group string, startMs int64, seen map[string]struct{}, limit int) (int64, error) {
+// limit>0이면 시간순 마지막 limit개만 출력한다. streams가 지정되면 해당 스트림만 조회한다.
+func fetchOnce(ctx context.Context, c *cloudwatchlogs.Client, group string, startMs int64, seen map[string]struct{}, limit int, streams []string) (int64, error) {
 	input := &cloudwatchlogs.FilterLogEventsInput{
 		LogGroupName: aws.String(group),
 		StartTime:    aws.Int64(startMs),
+	}
+	if len(streams) > 0 {
+		input.LogStreamNames = streams
 	}
 	p := cloudwatchlogs.NewFilterLogEventsPaginator(c, input)
 

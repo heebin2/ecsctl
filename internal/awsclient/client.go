@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	"github.com/aws/aws-sdk-go-v2/service/codebuild"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 )
@@ -28,6 +29,7 @@ type Clients struct {
 	ECS          *ecs.Client
 	Logs         *cloudwatchlogs.Client
 	CodePipeline *codepipeline.Client
+	CodeBuild    *codebuild.Client
 }
 
 // New는 DefaultRegion과 지정한 프로필로 모든 서비스 클라이언트를 생성한다.
@@ -47,6 +49,7 @@ func New(ctx context.Context, profile string) (*Clients, error) {
 		ECS:          ecs.NewFromConfig(cfg),
 		Logs:         cloudwatchlogs.NewFromConfig(cfg),
 		CodePipeline: codepipeline.NewFromConfig(cfg),
+		CodeBuild:    codebuild.NewFromConfig(cfg),
 	}, nil
 }
 

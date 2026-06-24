@@ -23,5 +23,22 @@ else
 fi
 
 rm -f "$BINARY"
-echo "==> installed: $(command -v $BINARY)"
+
+# 설치 대상이 ~/.local/bin 이 아니면, 거기 남아 있는 옛 ecs 를 정리한다.
+# (PATH에서 ~/.local/bin 이 먼저 잡혀 방금 설치한 바이너리를 가리는 문제 방지)
+STALE="$HOME/.local/bin/$BINARY"
+if [ "$TARGET" != "$STALE" ] && [ -e "$STALE" ]; then
+	echo "==> removing stale $STALE (PATH 섀도잉 방지)"
+	rm -f "$STALE"
+fi
+
+echo "==> installed: $TARGET"
+
+# PATH에서 실제로 잡히는 ecs 가 방금 설치한 것과 다르면 경고한다.
+RESOLVED="$(command -v "$BINARY" 2>/dev/null || true)"
+if [ -n "$RESOLVED" ] && [ "$RESOLVED" != "$TARGET" ]; then
+	echo "!! 경고: PATH에서 '$RESOLVED' 가 먼저 잡힙니다. 방금 설치한 '$TARGET' 가 가려집니다."
+	echo "!!       해당 파일을 지우거나 PATH 순서를 조정하세요."
+fi
+
 "$TARGET" --version 2>/dev/null || true

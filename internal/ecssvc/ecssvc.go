@@ -74,10 +74,21 @@ func describeServices(ctx context.Context, c *ecs.Client, cluster string, ids []
 
 // ListRunningTasks는 서비스의 실행 중 태스크 상세를 반환한다.
 func ListRunningTasks(ctx context.Context, c *ecs.Client, cluster, service string) ([]ecstypes.Task, error) {
+	return listServiceTasks(ctx, c, cluster, service, ecstypes.DesiredStatusRunning)
+}
+
+// ListStoppedTasks는 서비스의 최근 중지된 태스크 상세를 반환한다 (배포 실패 원인 진단용).
+func ListStoppedTasks(ctx context.Context, c *ecs.Client, cluster, service string) ([]ecstypes.Task, error) {
+	return listServiceTasks(ctx, c, cluster, service, ecstypes.DesiredStatusStopped)
+}
+
+// listServiceTasks는 desired 상태로 필터한 서비스 태스크 ARN을 모아 100개씩 배치로 상세 조회한다.
+func listServiceTasks(ctx context.Context, c *ecs.Client, cluster, service string, desired ecstypes.DesiredStatus) ([]ecstypes.Task, error) {
 	var arns []string
 	p := ecs.NewListTasksPaginator(c, &ecs.ListTasksInput{
-		Cluster:     aws.String(cluster),
-		ServiceName: aws.String(service),
+		Cluster:       aws.String(cluster),
+		ServiceName:   aws.String(service),
+		DesiredStatus: desired,
 	})
 	for p.HasMorePages() {
 		out, err := p.NextPage(ctx)
@@ -85,6 +96,9 @@ func ListRunningTasks(ctx context.Context, c *ecs.Client, cluster, service strin
 			return nil, fmt.Errorf("태스크 목록 조회 실패: %w", err)
 		}
 		arns = append(arns, out.TaskArns...)
+	}
+	if len(arns) == 0 {
+		return nil, nil
 	}
 
 	var result []ecstypes.Task
