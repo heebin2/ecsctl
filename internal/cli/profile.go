@@ -15,7 +15,7 @@ var profileCmd = &cobra.Command{
 	Short: "AWS 프로필 목록 표시 및 기본 프로필 설정",
 	Long: "~/.aws/{config,credentials} 의 프로필 목록을 보여주고(현재 기본값 * 표시),\n" +
 		"터미널이면 새 기본 프로필을 골라 ~/.aws/ecs-tools.yml 에 저장한다.\n" +
-		"이름을 인자로 주면 해당 프로필로 바로 설정한다. (프로필을 바꾸면 저장된 클러스터는 초기화)",
+		"이름을 인자로 주면 해당 프로필로 바로 설정한다. (클러스터는 프로필별로 기억된다)",
 	Example: "  ecs profile              # 목록 + (터미널이면) 선택해 저장\n" +
 		"  ecs profile my-profile   # 지정 프로필로 설정",
 	Args: cobra.MaximumNArgs(1),
@@ -66,7 +66,7 @@ var profileCmd = &cobra.Command{
 		if err := saveProfile(choice); err != nil {
 			return err
 		}
-		fmt.Printf("기본 프로필을 %s 로 설정했습니다. (클러스터는 다시 선택됩니다)\n", choice)
+		fmt.Printf("기본 프로필을 %s 로 설정했습니다.\n", choice)
 		return nil
 	},
 }

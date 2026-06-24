@@ -43,12 +43,12 @@ var clusterCmd = &cobra.Command{
 
 		// 비대화형: 목록만 출력
 		if !prompt.IsInteractive() {
-			printChoices("clusters", clusters, cfg.Cluster)
+			printChoices("clusters", clusters, cfg.ClusterFor(cfg.Profile))
 			return nil
 		}
 
 		// 대화형: 현재값 안내 후 선택·저장
-		printChoices("clusters", clusters, cfg.Cluster)
+		printChoices("clusters", clusters, cfg.ClusterFor(cfg.Profile))
 		choice, err := prompt.Select("기본 클러스터 선택", clusters)
 		if err != nil {
 			return err
