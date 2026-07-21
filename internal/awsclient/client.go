@@ -20,9 +20,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 )
 
-// DefaultRegion은 사용자 환경(서울 리전)에 맞춘 기본 리전이다.
-const DefaultRegion = "ap-northeast-2"
-
 // Clients는 CLI 전반에서 공유하는 AWS 서비스 클라이언트 묶음이다.
 type Clients struct {
 	Config       aws.Config
@@ -32,16 +29,24 @@ type Clients struct {
 	CodeBuild    *codebuild.Client
 }
 
-// New는 DefaultRegion과 지정한 프로필로 모든 서비스 클라이언트를 생성한다.
+// New는 지정한 프로필/리전으로 모든 서비스 클라이언트를 생성한다.
 // profile이 비어 있으면 default 자격증명 체인을 사용한다.
-func New(ctx context.Context, profile string) (*Clients, error) {
-	opts := []func(*config.LoadOptions) error{config.WithRegion(DefaultRegion)}
+// region이 비어 있으면 AWS 기본 체인(AWS_REGION/AWS_DEFAULT_REGION 환경변수,
+// 프로필의 region 설정)으로 리전을 해석하며, 그래도 확인되지 않으면 에러를 반환한다.
+func New(ctx context.Context, profile, region string) (*Clients, error) {
+	var opts []func(*config.LoadOptions) error
+	if region != "" {
+		opts = append(opts, config.WithRegion(region))
+	}
 	if profile != "" {
 		opts = append(opts, config.WithSharedConfigProfile(profile))
 	}
 	cfg, err := config.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("AWS 설정 로드 실패: %w", err)
+	}
+	if cfg.Region == "" {
+		return nil, errors.New("AWS 리전을 확인할 수 없습니다. --region 플래그, AWS_REGION 환경변수, 또는 프로필의 region 설정 중 하나를 지정하세요 (예: ecs list --region ap-northeast-2)")
 	}
 
 	return &Clients{

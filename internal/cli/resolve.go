@@ -78,6 +78,26 @@ func persistProfile(profile string) error {
 	return cfg.Save()
 }
 
+// resolveRegion은 사용할 AWS 리전을 결정한다.
+// 우선순위: --region 플래그 > 저장값. 둘 다 없으면 "" 를 반환해 AWS 기본 체인
+// (AWS_REGION/AWS_DEFAULT_REGION 환경변수, 프로필의 region 설정)에 리전 해석을 맡긴다.
+// 플래그가 지정되면 ~/.aws/ecs-tools.yml 에 저장해 다음 실행부터 자동 사용한다.
+func resolveRegion() (string, error) {
+	if regionFlag != "" {
+		return regionFlag, persistRegion(regionFlag)
+	}
+	return cfg.Region, nil
+}
+
+// persistRegion은 결정된 리전을 저장한다(값이 같으면 생략).
+func persistRegion(region string) error {
+	if region == cfg.Region {
+		return nil
+	}
+	cfg.Region = region
+	return cfg.Save()
+}
+
 // resolveCluster는 사용할 ECS 클러스터를 결정한다.
 // 우선순위: --cluster 플래그 > 저장값 > (1개면 자동, 여러 개면 대화형 선택).
 // 결정된 값은 ~/.aws/ecs-tools.yml 에 저장한다.

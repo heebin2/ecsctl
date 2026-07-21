@@ -14,6 +14,9 @@ import (
 // Settings는 ecs CLI가 기억하는 선택값이다.
 type Settings struct {
 	Profile string `yaml:"profile"`
+	// Region은 마지막으로 --region 으로 지정한 AWS 리전을 기억한다.
+	// 비어 있으면 AWS 기본 체인(환경변수/프로필)으로 해석한다.
+	Region string `yaml:"region,omitempty"`
 	// Cluster는 구버전 호환용(프로필별 저장 이전). Load 시 Clusters로 이관된다.
 	Cluster string `yaml:"cluster,omitempty"`
 	// Clusters는 프로필별로 마지막에 고른 클러스터를 기억한다(키: 프로필명, 빈 프로필은 "").
